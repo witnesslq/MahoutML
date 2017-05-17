@@ -1,0 +1,1 @@
+[{"values":null,"label":false,"type":"numerical"},{"values":null,"label":false,"type":"numerical"},{"values":null,"label":false,"type":"numerical"},{"values":null,"label":false,"type":"numerical"},{"values":["Iris-versicolor","Iris-virginica","Iris-setosa"],"label":true,"type":"categorical"}]
