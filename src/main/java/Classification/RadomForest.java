@@ -24,13 +24,14 @@ import org.apache.mahout.classifier.df.mapreduce.Classifier;
 import org.apache.mahout.classifier.df.mapreduce.inmem.InMemBuilder;
 import org.apache.mahout.classifier.df.mapreduce.partial.PartialBuilder;
 import org.apache.mahout.classifier.df.tools.Describe;
+import org.apache.mahout.classifier.evaluation.Auc;
 import org.apache.mahout.common.CommandLineUtil;
 import org.apache.mahout.common.HadoopUtil;
 import org.apache.mahout.common.commandline.DefaultOptionCreator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 
 public class RadomForest {
@@ -71,17 +72,17 @@ public class RadomForest {
 
 
     public static void main(String[] args) throws Exception {
-        String[] describeArgs = new String[] {"-p","ClassificationDir/RandomForestDir/input/iris.data",
-                "-f", "ClassificationDir/RandomForestDir/input/iris.info", "-d", "4","N","L"};
+        String[] describeArgs = new String[] {"-p","ClassificationDir/RandomForestDir/input/breastCancer.csv",
+                "-f", "ClassificationDir/RandomForestDir/input/breastCancer.info", "-d", "I","9","N","L"};
 
-        String[] buildArgs = new String[] {"-d","ClassificationDir/RandomForestDir/input/iris.data",
-                "-ds", "ClassificationDir/RandomForestDir/input/iris.info",
+        String[] buildArgs = new String[] {"-d","ClassificationDir/RandomForestDir/input/breastCancer.csv",
+                "-ds", "ClassificationDir/RandomForestDir/input/breastCancer.info",
                 "-o", "ClassificationDir/RandomForestDir/model", "-t", "30"};
 
-        String[] testArgs = new String[] {"-i","ClassificationDir/RandomForestDir/input/iris.data",
-                "-ds", "ClassificationDir/RandomForestDir/input/iris.info",
+        String[] testArgs = new String[] {"-i","ClassificationDir/RandomForestDir/input/breastCancerTest.csv",
+                "-ds", "ClassificationDir/RandomForestDir/input/breastCancer.info",
                 "-m", "ClassificationDir/RandomForestDir/model/forest.seq",
-                "-o", "ClassificationDir/RandomForestDir/prediction"};
+                "-o", "ClassificationDir/RandomForestDir/prediction","-a"};
         final RadomForest application = new RadomForest();
 
         try {
@@ -298,7 +299,7 @@ public class RadomForest {
         if (outputPath != null) {
             outFS = outputPath.getFileSystem(configuration);
             if (outFS.exists(outputPath)) {
-                throw new IllegalArgumentException("Output path already exists");
+                HadoopUtil.delete(configuration, outputPath);
             }
         }
 
@@ -316,6 +317,9 @@ public class RadomForest {
         if (useMapreduce) {
             mapreduce(configuration);
         }
+
+        Auc collector = new Auc();
+
     }
 
     private void mapreduce(Configuration conf) throws ClassNotFoundException, IOException, InterruptedException {
@@ -328,12 +332,19 @@ public class RadomForest {
         classifier.run();
 
         if (analyze) {
+            File file = new File(BASE_PATH+"result.txt");
+            if (!file.exists()) {
+                file.createNewFile();
+            }
+            FileWriter fileWriter = new FileWriter(file.getAbsoluteFile());
+            BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
             double[][] results = classifier.getResults();
             if (results != null) {
                 Dataset dataset = Dataset.load(conf, datasetPath);
                 if (dataset.isNumerical(dataset.getLabelId())) {
                     RegressionResultAnalyzer regressionAnalyzer = new RegressionResultAnalyzer();
                     regressionAnalyzer.setInstances(results);
+                    bufferedWriter.write(regressionAnalyzer.toString());
                     log.info("{}", regressionAnalyzer);
                 } else {
                     ResultAnalyzer analyzer = new ResultAnalyzer(Arrays.asList(dataset.labels()), "unknown");
@@ -341,9 +352,11 @@ public class RadomForest {
                         analyzer.addInstance(dataset.getLabelString(res[0]),
                                 new ClassifierResult(dataset.getLabelString(res[1]), 1.0));
                     }
+                    bufferedWriter.write(analyzer.toString());
                     log.info("{}", analyzer);
                 }
             }
+            bufferedWriter.close();
         }
     }
 

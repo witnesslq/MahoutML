@@ -8,36 +8,47 @@ import org.apache.commons.cli2.builder.DefaultOptionBuilder;
 import org.apache.commons.cli2.builder.GroupBuilder;
 import org.apache.commons.cli2.commandline.Parser;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.SequenceFile;
+import org.apache.hadoop.io.Text;
 import org.apache.mahout.clustering.canopy.CanopyDriver;
 import org.apache.mahout.clustering.classify.WeightedPropertyVectorWritable;
 import org.apache.mahout.clustering.conversion.InputDriver;
 import org.apache.mahout.clustering.fuzzykmeans.FuzzyKMeansDriver;
+import org.apache.mahout.clustering.kmeans.Kluster;
 import org.apache.mahout.common.ClassUtils;
 import org.apache.mahout.common.CommandLineUtil;
 import org.apache.mahout.common.HadoopUtil;
 import org.apache.mahout.common.commandline.DefaultOptionCreator;
 import org.apache.mahout.common.distance.DistanceMeasure;
 import org.apache.mahout.common.distance.SquaredEuclideanDistanceMeasure;
+import org.apache.mahout.math.DenseVector;
+import org.apache.mahout.math.Vector;
+import org.apache.mahout.math.VectorWritable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 
 public class FuzzyKmeans {
 
     private static final Logger log = LoggerFactory.getLogger(FuzzyKmeans.class);
 
+    private String dataPath = "testdata";
+
     private static final String M_OPTION = FuzzyKMeansDriver.M_OPTION;
 
     private final String BASE_PATH = "ClusteringDir/FuzzyKmeansDir/";
 
+    private final String POINTS_PATH = BASE_PATH + "points";
+
     private final String OUTPUT_PATH = BASE_PATH + "output";
+
+    private final String CLUSTERS_PATH = BASE_PATH + "clusters";
 
     private Path input; // the input directory path
 
@@ -55,7 +66,7 @@ public class FuzzyKmeans {
 
     public static void main(String[] args) throws Exception {
         final FuzzyKmeans application = new FuzzyKmeans();
-        args = new String[] {"-i","ClusteringDir/FuzzyKmeansDir/testdata","-cd","0.001","-x","10","-ow","-t1","1.1","-t2","1","-m", "2.0"};
+        args = new String[] {"-i","ClusteringDir/FuzzyKmeansDir/breastCancer.csv","-cd","5","-x","10","-ow","-k","2","-m","2.0"};
         try {
             application.runFuzzyKmeans(args);
         }
@@ -84,7 +95,8 @@ public class FuzzyKmeans {
 
         Group group = gbuilder.withName("Options").withOption(inputOpt).withOption(mOpt)
                 .withOption(distanceMeasureOpt).withOption(convergenceOpt).withOption(maxIterationsOpt)
-                .withOption(t1Opt).withOption(t2Opt).withOption(overwriteOpt).withOption(helpOpt).create();
+                .withOption(t1Opt).withOption(t2Opt)
+                .withOption(overwriteOpt).withOption(helpOpt).create();
 
         Parser parser = new Parser();
         parser.setGroup(group);
@@ -93,7 +105,6 @@ public class FuzzyKmeans {
             CommandLineUtil.printHelp(group);
             return;
         }
-
         input = new Path(cmdLine.getValue(inputOpt).toString());
         output = new Path(OUTPUT_PATH);
         measureClass = cmdLine.getValue(distanceMeasureOpt).toString();
@@ -113,13 +124,12 @@ public class FuzzyKmeans {
         double t2 = Double.parseDouble(cmdLine.getValue(t2Opt).toString());
 
         Path directoryContainingConvertedInput = new Path(output, DIRECTORY_CONTAINING_CONVERTED_INPUT);
-        log.info("Preparing Input");
         InputDriver.runJob(input, directoryContainingConvertedInput, "org.apache.mahout.math.RandomAccessSparseVector");
-        log.info("Running Clustering.Canopy to get initial clusters");
         Path canopyOutput = new Path(output, "canopies");
         CanopyDriver.run(configuration, directoryContainingConvertedInput, canopyOutput, measure, t1, t2, false, 0.0,
                 false);
-        log.info("Running Fuzzy KMeans");
+
+
         FuzzyKMeansDriver.run(directoryContainingConvertedInput, new Path(canopyOutput, "clusters-0-final"), output,
                 convergenceDelta, maxIterations, fuzziness, true, true, 0.0, false);
         readAndPrintOutputValues(configuration, output.toString());

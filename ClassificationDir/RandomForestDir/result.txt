@@ -1,0 +1,25 @@
+
+=======================================================
+Summary
+-------------------------------------------------------
+Correctly Classified Instances          :        168	   97.1098%
+Incorrectly Classified Instances        :          5	    2.8902%
+Total Classified Instances              :        173
+
+=======================================================
+Confusion Matrix
+-------------------------------------------------------
+a    	b    	<--Classified as
+120  	5    	 |  125   	a     = 2
+0    	48   	 |  48    	b     = 4
+
+=======================================================
+Statistics
+-------------------------------------------------------
+Kappa                                       0.8952
+Accuracy                                   97.1098%
+Reliability                                65.3333%
+Reliability (standard deviation)            0.5662
+Weighted precision                          0.9738
+Weighted recall                             0.9711
+Weighted F1 score                           0.9715

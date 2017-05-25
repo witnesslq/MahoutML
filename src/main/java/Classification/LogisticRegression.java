@@ -27,7 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class LogisticRegression {
-    private static final Logger log = LoggerFactory.getLogger(RadomForest.class);
+    private static final Logger log = LoggerFactory.getLogger(LogisticRegression.class);
 
     private static LogisticModelParameters lmp;
     private String inputFile; // the input directory path
@@ -36,12 +36,13 @@ public class LogisticRegression {
     private boolean scores;
 
     public static void main(String[] args) throws Exception {
-        String[] trainArg = new String[] {"-i","ClassificationDir/LogisticRegressionDir/input/inputData.csv",
+        String[] trainArg = new String[] {"-i","ClassificationDir/LogisticRegressionDir/input/breastCancer.csv",
                 "-o", "ClassificationDir/LogisticRegressionDir/model/modelOutput",
-                "--predictors", "model","age","mileage",
-        "--types", "text", "numeric", "numeric","--target","result","--categories","2","--passes","1000","--features","23","--rate","5"};
+                "--predictors", "Clump Thickness","Uniformity of Cell Size","Uniformity of Cell Shape","Marginal Adhesion"
+                ,"Single Epithelial Cell Size","Bare Nuclei","Bland Chromatin","Normal Nucleoli","Mitoses",
+        "--types","numeric","--target","Class","--categories","2","--passes","500","--features","100","--rate","1"};
 
-        String[] testArg = new String[] {"--input","ClassificationDir/LogisticRegressionDir/input/inputData.csv",
+        String[] testArg = new String[] {"--input","ClassificationDir/LogisticRegressionDir/input/breastCancerTest.csv",
                 "--model", "ClassificationDir/LogisticRegressionDir/model/modelOutput",
                 "--scores", "--auc","--confusion"};
 
@@ -54,7 +55,7 @@ public class LogisticRegression {
         application.testModel(testArg);
     }
 
-    public OnlineLogisticRegression train(String[] arg) throws IOException {
+    public void train(String[] arg) throws IOException {
         DefaultOptionBuilder obuilder = new DefaultOptionBuilder();
 
 
@@ -114,7 +115,6 @@ public class LogisticRegression {
         CommandLine cmdLine = parser.parseAndHelp(arg);
         if (cmdLine.hasOption("help")) {
             CommandLineUtil.printHelp(group);
-            return null;
         }
         List<String> typeList = Lists.newArrayList();
         for (Object x : cmdLine.getValues(typesOpt)) {
@@ -160,7 +160,6 @@ public class LogisticRegression {
         } catch (Exception e){
             log.error("Save to file fail...");
         }
-        return olr;
     }
 
     void testModel(String[] arg) throws Exception {
@@ -242,7 +241,7 @@ public class LogisticRegression {
         }
 
         if (showAuc) {
-            System.out.printf(Locale.ENGLISH, "AUC = %.2f%n", collector.auc());
+            System.out.printf(Locale.ENGLISH, "AUC = %.3f%n", collector.auc());
         }
         if (showConfusion) {
             Matrix m = collector.confusion();

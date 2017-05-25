@@ -5,12 +5,14 @@ import org.apache.commons.cli2.Group;
 import org.apache.commons.cli2.Option;
 import org.apache.commons.cli2.builder.GroupBuilder;
 import org.apache.commons.cli2.commandline.Parser;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Text;
 import org.apache.mahout.clustering.classify.WeightedPropertyVectorWritable;
+import org.apache.mahout.clustering.fuzzykmeans.FuzzyKMeansDriver;
 import org.apache.mahout.clustering.kmeans.KMeansDriver;
 import org.apache.mahout.clustering.kmeans.Kluster;
 import org.apache.mahout.common.ClassUtils;
@@ -19,6 +21,7 @@ import org.apache.mahout.common.HadoopUtil;
 import org.apache.mahout.common.commandline.DefaultOptionCreator;
 import org.apache.mahout.common.distance.DistanceMeasure;
 import org.apache.mahout.common.distance.EuclideanDistanceMeasure;
+import org.apache.mahout.common.distance.SquaredEuclideanDistanceMeasure;
 import org.apache.mahout.math.DenseVector;
 import org.apache.mahout.math.Vector;
 import org.apache.mahout.math.VectorWritable;
@@ -47,7 +50,7 @@ public class Kmeans {
 
     public static void main(String[] args) {
         final Kmeans application = new Kmeans();
-        args = new String[] {"-i","ClusteringDir/KmeansDir/testdata","-k","3","-cd","0.001","-x","10"};
+        args = new String[] {"-i","ClusteringDir/KmeansDir/breastCancer.csv","-k","2","-cd","0.001","-x","10"};
         try {
             application.runKmeans(args);
         }
@@ -80,7 +83,7 @@ public class Kmeans {
             CommandLineUtil.printHelp(group);
             return;
         }
-        this.numberOfCluster = Integer.parseInt(cmdLine.getValue(numClustersOpt).toString());
+        numberOfCluster = Integer.parseInt(cmdLine.getValue(numClustersOpt).toString());
         // Create input directories for data
         final File pointsDir = new File(POINTS_PATH);
         if (!pointsDir.exists()) {
@@ -93,7 +96,8 @@ public class Kmeans {
         List<DenseVector> vectors = toDenseVector(configuration);
 
         if (measureClass == null) {
-            measureClass = EuclideanDistanceMeasure.class.getName();
+            measureClass = SquaredEuclideanDistanceMeasure.class.getCanonicalName();
+//            measureClass = EuclideanDistanceMeasure.class.getName();
         }
         // Write initial centers for clusters
         writeClusterInitialCenters(configuration, measureClass, vectors);
@@ -117,9 +121,7 @@ public class Kmeans {
         final Path writerPath = new Path(CLUSTERS_PATH + "/part-00000");
 
         final SequenceFile.Writer writer =
-                SequenceFile.createWriter(
-                        conf,
-                        SequenceFile.Writer.file(writerPath),
+                SequenceFile.createWriter(conf, SequenceFile.Writer.file(writerPath),
                         SequenceFile.Writer.keyClass(Text.class),
                         SequenceFile.Writer.valueClass(Kluster.class));
 
@@ -152,13 +154,28 @@ public class Kmeans {
         FileWriter fileWriter = new FileWriter(file.getAbsoluteFile());
         BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
         Integer vecNum = 0;
+        int correctCount = 0;
+        List<String> raw = FileUtils.readLines(new File(BASE_PATH+"breastCancerWithClass.csv"));
+        int[] targets = new int[raw.size()];
+        int i = 0;
+        for (String line:raw) {
+            targets[i++] = Integer.parseInt(line.split(",")[10]) == 4? 1:0;
+        }
         while (reader.next(key, value)) {
             String[] values = value.toString().split("vec");
             String content = values[0]+"vec: "+vecNum+values[1].substring(1)+" belongs to cluster "+key.toString()+"\n";
             bufferedWriter.write(content);
+            if (key.get() == targets[vecNum]) {
+                correctCount++;
+            }
             vecNum++;
         }
         reader.close();
+        float correctRatio = (float)correctCount/(float)targets.length;
+        int inCorrectCount = targets.length - correctCount;
+        float inCorrectRatio = 1 - correctRatio;
+        bufferedWriter.write("Correctly Clustered Instances: " + correctCount + " " + correctRatio + "\n");
+        bufferedWriter.write("Incorrectly Clustered Instances: " + inCorrectCount + " " + inCorrectRatio+ "\n");
         bufferedWriter.close();
 
     }
@@ -172,7 +189,7 @@ public class Kmeans {
 
         String sCurrentLine;
         while ((sCurrentLine = br.readLine()) != null) {
-            double[] features = new double[4];
+            double[] features = new double[9];
             String[] values = sCurrentLine.split(",");
             for(int indx=0; indx<features.length;indx++){
                 features[indx] = Float.parseFloat(values[indx]);

@@ -20,6 +20,7 @@ import org.apache.mahout.common.HadoopUtil;
 import org.apache.mahout.common.commandline.DefaultOptionCreator;
 import org.apache.mahout.common.distance.DistanceMeasure;
 import org.apache.mahout.common.distance.SquaredEuclideanDistanceMeasure;
+import org.apache.mahout.utils.clustering.ClusterDumper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,7 +50,7 @@ public class Canopy {
 
     public static void main(String[] args) throws Exception {
         final Canopy application = new Canopy();
-        args = new String[] {"-i","ClusteringDir/CanopyDir/testdata","-cd","0.001","-x","10","-ow","-t1","1.0","-t2","0.95"};
+        args = new String[] {"-i","ClusteringDir/CanopyDir/breastCancer.csv","-cd","5","-x","10","-ow","-t1","23","-t2","14"};
         try {
             application.runCanopy(args);
         }
@@ -100,13 +101,10 @@ public class Canopy {
         double t2 = Double.parseDouble(cmdLine.getValue(t2Opt).toString());
 
         Path directoryContainingConvertedInput = new Path(output, DIRECTORY_CONTAINING_CONVERTED_INPUT);
-        log.info("Preparing Input");
         InputDriver.runJob(input, directoryContainingConvertedInput, "org.apache.mahout.math.RandomAccessSparseVector");
-        log.info("Running Clustering.Canopy to get initial clusters");
         Path canopyOutput = new Path(output, "canopies");
         CanopyDriver.run(configuration, directoryContainingConvertedInput, canopyOutput, measure, t1, t2, false, 0.0,
                 false);
-        log.info("Running KMeans");
         KMeansDriver.run(configuration, directoryContainingConvertedInput, new Path(canopyOutput, Cluster.INITIAL_CLUSTERS_DIR
                 + "-final"), output, convergenceDelta, maxIterations, true, 0.0, false);
         readAndPrintOutputValues(configuration, output.toString());
@@ -115,6 +113,7 @@ public class Canopy {
     private void readAndPrintOutputValues(Configuration conf, String outputPath)
             throws IOException {
         final Path input = new Path(outputPath + "/clusteredPoints/part-m-00000");
+
         final SequenceFile.Reader reader = new SequenceFile.Reader(conf, SequenceFile.Reader.file(input));
         final IntWritable key = new IntWritable();
         final WeightedPropertyVectorWritable value = new WeightedPropertyVectorWritable();
